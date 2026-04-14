@@ -61,7 +61,7 @@ def run_migrations_online() -> None:
 
     """
     connectable = create_engine(
-        settings.SQLALCHEMY_DATABASE_URL
+        settings.DATABASE_URL
     )
 
     with connectable.connect() as connection:
