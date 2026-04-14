@@ -1,0 +1,46 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: docs_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: docs_db
+    ports:
+      - "5433:5432"  # 5433 to avoid conflict with existing project
+    volumes:
+      - docs_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d docs_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: docs_redis
+    ports:
+      - "6380:6379"  # 6380 to avoid conflict with existing project
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: docs_fastapi
+    ports:
+      - "8001:8000"  # 8001 to avoid conflict with existing project
+    env_file:
+      - .env
+    volumes:
+      - .:/code
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  docs_postgres_data:
