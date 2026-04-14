@@ -1,6 +1,8 @@
 from typing import List
 from pydantic import PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+print("=== ENV CHECK ===", os.environ.get("DATABASE_URL"), os.environ.get("SECRET_KEY"))
 
 
 class Settings(BaseSettings):
