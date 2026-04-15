@@ -66,14 +66,11 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    import logging
-
-    url = os.environ.get("DATABASE_URL", "NOT FOUND")
-    logging.warning(f"RAW DATABASE_URL: {url}")
-    logging.warning(f"DATABASE_URL being used: {settings.DATABASE_URL}")
-    connectable = create_engine(
-        settings.DATABASE_URL
-    )
+    import os
+    db_url = os.environ["DATABASE_URL"]
+    print(f"DIRECT OS URL: {db_url}", flush=True)
+    
+    connectable = create_engine(db_url)
 
     with connectable.connect() as connection:
         context.configure(
