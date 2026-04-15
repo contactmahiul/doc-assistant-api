@@ -16,7 +16,7 @@ from app.core.limiter import limiter
 
 setup_logging()
 
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 app = FastAPI()
 app.include_router(api.api_router,prefix="/api/v1")
 app.add_middleware(CorrelationIDMiddleware)
