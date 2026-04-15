@@ -1,4 +1,5 @@
 FROM python:3.12-slim
+ENV CACHE_BUST=2
 
 # Step 1: Set working directory
 WORKDIR /code
