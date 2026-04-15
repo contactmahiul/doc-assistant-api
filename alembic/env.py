@@ -59,6 +59,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    import logging
+    logging.warning(f"DATABASE_URL being used: {settings.DATABASE_URL}")
     connectable = create_engine(
         settings.DATABASE_URL
     )
