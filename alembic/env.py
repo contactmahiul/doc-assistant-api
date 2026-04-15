@@ -6,6 +6,7 @@ from alembic import context
 from app.db.base import Base
 from app.core.config import settings
 from sqlalchemy import create_engine
+import os
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -60,6 +61,9 @@ def run_migrations_online() -> None:
 
     """
     import logging
+
+    url = os.environ.get("DATABASE_URL", "NOT FOUND")
+    logging.warning(f"RAW DATABASE_URL: {url}")
     logging.warning(f"DATABASE_URL being used: {settings.DATABASE_URL}")
     connectable = create_engine(
         settings.DATABASE_URL
