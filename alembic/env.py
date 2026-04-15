@@ -4,9 +4,15 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.db.base import Base
+import os
+print("=== ENV CHECK ===", flush=True)
+print("DATABASE_URL:", os.environ.get("DATABASE_URL", "NOT SET"), flush=True)
+print("SECRET_KEY:", os.environ.get("SECRET_KEY", "NOT SET"), flush=True)
+print("GROQ_API_KEY:", os.environ.get("GROQ_API_KEY", "NOT SET"), flush=True)
+print("=================", flush=True)
 from app.core.config import settings
 from sqlalchemy import create_engine
-import os
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
