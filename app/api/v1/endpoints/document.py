@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -7,11 +7,13 @@ from app.schema.document import DocumentCreate, DocumentRead
 from app.utils.chunking import chunk_text
 from app.utils.embeddings import embed_batch
 import asyncio
+from app.core.limiter import limiter
 
 router = APIRouter()
 
 @router.post("/",response_model = DocumentRead, status_code=201)
-async def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+async def create_document(request: Request, payload: DocumentCreate, db: Session = Depends(get_db)):
     doc = Document(title = payload.title, content= payload.content)
     db.add(doc)
     db.flush()

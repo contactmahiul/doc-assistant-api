@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -8,11 +8,13 @@ from app.utils.embeddings import embed_text
 from app.core.config import settings
 from app.utils.retrieval import retrieve_relevant_chunks
 import asyncio
+from app.core.limiter import limiter
 
 router = APIRouter()
 
 @router.post("/", response_model= QueryResponse)
-async def query_documents(payload: QueryRequest , db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def query_documents(request: Request, payload: QueryRequest , db: Session = Depends(get_db)):
 
     relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,

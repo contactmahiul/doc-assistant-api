@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -10,12 +10,14 @@ from app.utils.embeddings import embed_text
 from app.utils.llm import generate_answer
 from app.utils.retrieval import retrieve_relevant_chunks
 import asyncio
+from app.core.limiter import limiter
 
 router = APIRouter()
 
 
 @router.post("/", response_model=ChatResponse)
-async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def chat(request: Request,payload: ChatRequest, db: Session = Depends(get_db)):
    
     relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,
