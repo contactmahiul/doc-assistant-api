@@ -5,6 +5,7 @@ import asyncio
 
 from app.core.config import settings
 from app.utils.embeddings import embed_text
+from app.cache import get_cached_embedding,set_cached_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,11 @@ async def retrieve_relevant_chunks(
 
     threshold = threshold if threshold is not None else settings.RETRIEVAL_DISTANCE_THRESHOLD
 
-    query_vector = await asyncio.to_thread(embed_text, question)
+    query_vector = get_cached_embedding(question)
+    if query_vector is None:
+        query_vector = await asyncio.to_thread(embed_text, question)
 
+        set_cached_embedding(question, query_vector)
     def _db_query():
         db.execute(text("SET ivfflat.probes = 3"))
         return db.execute(text("""

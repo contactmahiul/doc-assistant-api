@@ -8,6 +8,10 @@ from app.utils.chunking import chunk_text
 from app.utils.embeddings import embed_batch
 import asyncio
 from app.core.limiter import limiter
+from app.core.redis_client import redis_client
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -37,4 +41,12 @@ async def create_document(request: Request, payload: DocumentCreate, db: Session
     )
     db.commit()
     db.refresh(doc)
+    try:
+        keys = redis_client.keys("response:*")
+        if keys:
+            redis_client.delete(*keys)
+            logger.info(f"Cleared {len(keys)} cached responses after new document")
+    except Exception as e:
+        logger.warning(f"Cache invalidation failed: {e}")
+        
     return doc

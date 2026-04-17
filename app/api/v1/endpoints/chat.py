@@ -11,6 +11,7 @@ from app.utils.llm import generate_answer
 from app.utils.retrieval import retrieve_relevant_chunks
 import asyncio
 from app.core.limiter import limiter
+from app.cache import get_cached_response, set_cached_response
 
 router = APIRouter()
 
@@ -18,6 +19,10 @@ router = APIRouter()
 @router.post("/", response_model=ChatResponse)
 @limiter.limit("10/minute")
 async def chat(request: Request,payload: ChatRequest, db: Session = Depends(get_db)):
+
+    cached = get_cached_response(payload.question)
+    if cached:
+        return ChatResponse(**cached)
    
     relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,
@@ -29,7 +34,9 @@ async def chat(request: Request,payload: ChatRequest, db: Session = Depends(get_
     chunk_texts = [row.content for row in relevant]
     answer = await asyncio.to_thread(generate_answer, payload.question, chunk_texts)
 
-    return ChatResponse(
+    
+
+    response = ChatResponse(
         question=payload.question,
         answer=answer,
         filtered_count = filtered_count,
@@ -44,3 +51,7 @@ async def chat(request: Request,payload: ChatRequest, db: Session = Depends(get_
             for row in relevant
         ]
     )
+
+    set_cached_response(payload.question, response.model_dump())
+
+    return response
