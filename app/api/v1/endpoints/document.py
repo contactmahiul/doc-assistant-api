@@ -6,20 +6,21 @@ from app.model.document import Document, Chunk
 from app.schema.document import DocumentCreate, DocumentRead
 from app.utils.chunking import chunk_text
 from app.utils.embeddings import embed_batch
+import asyncio
 
 router = APIRouter()
 
 @router.post("/",response_model = DocumentRead, status_code=201)
-def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
+async def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
     doc = Document(title = payload.title, content= payload.content)
     db.add(doc)
     db.flush()
 
-    chunks = chunk_text(doc.content)
+    chunks = await asyncio.to_thread(chunk_text, doc.content)
     if not chunks:
         raise HTTPException(status_code=422, detail="Document produced no chunks")
     
-    vectors = embed_batch(chunks)
+    vectors = await asyncio.to_thread(embed_batch, chunks)
     
     db.add_all(
         [

@@ -7,18 +7,14 @@ from app.schema.query import QueryRequest, QueryResponse, ChunkResult
 from app.utils.embeddings import embed_text
 from app.core.config import settings
 from app.utils.retrieval import retrieve_relevant_chunks
+import asyncio
 
 router = APIRouter()
 
 @router.post("/", response_model= QueryResponse)
-def query_documents(payload: QueryRequest , db: Session = Depends(get_db)):
-    threshold = payload.threshold if payload.threshold is not None else settings.RETRIEVAL_DISTANCE_THRESHOLD
-    query_embed = embed_text(payload.question)
-    db.execute(text("SET ivfflat.probes = 3"))
+async def query_documents(payload: QueryRequest , db: Session = Depends(get_db)):
 
-
-
-    relevant, filtered_count = retrieve_relevant_chunks(
+    relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,
         db=db,
         top_k=payload.top_k,

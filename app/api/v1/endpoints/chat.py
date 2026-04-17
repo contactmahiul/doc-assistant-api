@@ -8,16 +8,16 @@ from app.schema.chat import ChatRequest, ChatResponse
 from app.schema.query import ChunkResult
 from app.utils.embeddings import embed_text
 from app.utils.llm import generate_answer
-from app.core.config import settings
 from app.utils.retrieval import retrieve_relevant_chunks
+import asyncio
 
 router = APIRouter()
 
 
 @router.post("/", response_model=ChatResponse)
-def chat(payload: ChatRequest, db: Session = Depends(get_db)):
+async def chat(payload: ChatRequest, db: Session = Depends(get_db)):
    
-    relevant, filtered_count = retrieve_relevant_chunks(
+    relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,
         db=db,
         top_k=payload.top_k,
@@ -25,7 +25,7 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db)):
     )
 
     chunk_texts = [row.content for row in relevant]
-    answer = generate_answer(payload.question, chunk_texts)
+    answer = await asyncio.to_thread(generate_answer, payload.question, chunk_texts)
 
     return ChatResponse(
         question=payload.question,
