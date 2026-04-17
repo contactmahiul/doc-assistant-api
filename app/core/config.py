@@ -23,7 +23,8 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str
 
-    
+    RETRIEVAL_DISTANCE_THRESHOLD : float = 0.4
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

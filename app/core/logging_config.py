@@ -20,7 +20,7 @@ class StructuredFormatter(logging.Formatter):
             "function": record.funcName,
             
         }
-            # Automatically capture all extra fields
+            
         for key, value in record.__dict__.items():
             if key not in self.STANDARD_FIELDS and key not in log_data:
                 log_data[key] = value
