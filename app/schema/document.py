@@ -2,9 +2,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-
-# --- Chunk Schemas ---
-
 class ChunkBase(BaseModel):
     content: str
     chunk_index: int
@@ -22,9 +19,6 @@ class ChunkRead(ChunkBase):
 
     model_config = {"from_attributes": True}
 
-
-# --- Document Schemas ---
-
 class DocumentBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     content: str = Field(..., min_length=1)
@@ -39,6 +33,7 @@ class DocumentRead(DocumentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     chunks: list[ChunkRead] = []
+    source: str 
 
     model_config = {"from_attributes": True}
 
@@ -46,3 +41,12 @@ class DocumentRead(DocumentBase):
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     content: Optional[str] = Field(None, min_length=1)
+
+class PDFUploadResponse(BaseModel):
+    id: int
+    title: str
+    source: str
+    page_count: int
+    chunk_count: int
+    created_at: datetime
+    model_config = {"from_attributes": True}

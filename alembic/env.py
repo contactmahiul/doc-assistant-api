@@ -67,7 +67,7 @@ def run_migrations_online() -> None:
 
     """
     import os
-    db_url = os.environ["DATABASE_URL"]
+    db_url = settings.DATABASE_URL
     print(f"DIRECT OS URL: {db_url}", flush=True)
     
     connectable = create_engine(db_url)
