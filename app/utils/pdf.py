@@ -1,39 +1,71 @@
 import logging
-import fitz
+import tempfile
+import os
 from fastapi import UploadFile
+from app.extractors.extraction_pipeline import ExtractionPipeline
+from app.extractors.ocr_handler import OCRBackend
 
 logger = logging.getLogger(__name__)
 
-async def extract_text_from_pdf(file: UploadFile) -> tuple[str, int]:
- 
+# Single pipeline instance — reused across requests
+_pipeline = ExtractionPipeline(
+    run_ocr=True,
+    ocr_backend=OCRBackend.TESSERACT,
+    ocr_dpi=300,
+    ocr_language="eng",
+    extract_tables=True,
+    min_table_rows=2,
+    min_table_cols=2,
+    camelot_fallback=True,
+)
+
+
+async def extract_text_from_pdf(file: UploadFile) -> dict:
+    """
+    Run the full extraction pipeline on an uploaded PDF.
+    Returns the structured result dict from ExtractionPipeline.run()
+    """
     pdf_bytes = await file.read()
 
     if not pdf_bytes:
         raise ValueError("Uploaded PDF file is empty")
 
-    pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    # Pipeline needs a file path, not bytes — save to temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
 
-    if pdf_document.page_count == 0:
-        raise ValueError("PDF has no pages")
+    try:
+        result = _pipeline.run(tmp_path)
+    except Exception as e:
+        logger.error(f"Extraction pipeline failed: {e}")
+        raise ValueError(f"Failed to extract content from PDF: {e}")
+    finally:
+        # Always clean up temp file
+        os.unlink(tmp_path)
 
-    page_count = pdf_document.page_count
-    extracted_pages = []
-
-    for page_num in range(page_count):
-        page = pdf_document[page_num]
-        text = page.get_text()
-        if text.strip():
-            extracted_pages.append(text.strip())
-
-    pdf_document.close()
-
-    if not extracted_pages:
-        raise ValueError("Could not extract any text from PDF — may be scanned/image based")
-
-    full_text = "\n\n".join(extracted_pages)
+    # Validate something was actually extracted
+    total_content = _count_extractable_content(result)
+    if total_content == 0:
+        raise ValueError("Could not extract any content from PDF")
 
     logger.info(
-        f"PDF extracted | pages={page_count} chars={len(full_text)}"
+        f"PDF extracted | file={file.filename} "
+        f"pages={result['metadata']['page_count']} "
+        f"scanned={result['metadata']['scanned_page_numbers']} "
+        f"tables={sum(len(p['tables']) for p in result['pages'])} "
+        f"chars={len(result['full_text'])}"
     )
 
-    return full_text, page_count
+    return result
+
+
+def _count_extractable_content(result: dict) -> int:
+    """Count total extractable items across all pages."""
+    total = 0
+    for page in result["pages"]:
+        total += len([b for b in page["blocks"] if b["text"].strip()])
+        total += len(page["tables"])
+        if page["ocr_text"]:
+            total += 1
+    return total
