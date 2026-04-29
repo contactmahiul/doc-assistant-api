@@ -1,4 +1,3 @@
-# app/schemas/chat.py
 from pydantic import BaseModel, Field
 from app.schema.query import ChunkResult
 

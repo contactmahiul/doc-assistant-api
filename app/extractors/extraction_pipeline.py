@@ -1,32 +1,7 @@
-"""
-extraction_pipeline.py
-─────────────────────────────────────────────────────────────────────────────
-Orchestrates pdf_extractor + table_extractor + ocr_handler into a single
-function call that returns everything the chunker needs.
-
-Output shape:
-  {
-    "metadata": { ... },
-    "toc": [ {level, title, page}, ... ],
-    "pages": [
-      {
-        "page_number": 1,
-        "blocks": [ {block_type, text, section_heading, ...}, ... ],
-        "tables": [ {markdown, dataframe, confidence, ...}, ... ],
-        "ocr_text": null | "...",   # only if page was scanned
-      },
-      ...
-    ],
-    "full_text": "...",
-  }
-
-This dict is also serialisable to JSON (DataFrames are excluded from JSON
-output; use the per-page markdown strings for embedding).
-"""
-
 from __future__ import annotations
-
 import dataclasses
+import hashlib
+from importlib.resources import path
 import json
 import logging
 from dataclasses import asdict
@@ -41,21 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExtractionPipeline:
-    """
-    Usage
-    -----
-    pipeline = ExtractionPipeline()
-    result = pipeline.run("paper.pdf")
 
-    # Access structured pages
-    for page in result["pages"]:
-        print(page["page_number"], len(page["blocks"]), "blocks")
-        for tbl in page["tables"]:
-            print(tbl["markdown"])
-
-    # Persist for inspection
-    pipeline.save_json(result, "output/paper.json")
-    """
 
     def __init__(
         self,
@@ -78,13 +39,14 @@ class ExtractionPipeline:
             backend=ocr_backend, dpi=ocr_dpi, language=ocr_language
         ) if run_ocr else None
 
-    # ── Main entry ───────────────────────────────────────────────────────────
 
     def run(self, pdf_path: str | Path) -> dict[str, Any]:
         path = Path(pdf_path)
         logger.info("Starting extraction: %s", path.name)
 
-        # 1. Base extraction
+        import hashlib
+        file_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+
         doc = self.pdf_extractor.extract(path)
         logger.info(
             "Pages: %d | Scanned: %s",
@@ -92,7 +54,6 @@ class ExtractionPipeline:
             doc.metadata.scanned_page_numbers,
         )
 
-        # 2. Tables
         tables_by_page: dict[int, list] = {}
         if self.table_extractor:
             all_tables = self.table_extractor.extract(path)
@@ -100,7 +61,6 @@ class ExtractionPipeline:
                 tables_by_page.setdefault(t.page_number, []).append(t)
             logger.info("Tables found: %d", len(all_tables))
 
-        # 3. OCR for scanned pages
         ocr_by_page: dict[int, str] = {}
         if self.ocr_handler and doc.metadata.scanned_page_numbers:
             ocr_results = self.ocr_handler.ocr_pages(
@@ -110,7 +70,6 @@ class ExtractionPipeline:
                 ocr_by_page[r.page_number] = r.text
             logger.info("OCR'd %d scanned pages", len(ocr_results))
 
-        # 4. Assemble result
         pages_out = []
         for page_idx, blocks in enumerate(doc.pages):
             pn = page_idx + 1
@@ -124,6 +83,8 @@ class ExtractionPipeline:
             })
 
         meta = asdict(doc.metadata)
+        meta["file_hash_sha256"] = file_hash
+        meta["file_name"] = path.name
 
         return {
             "metadata": meta,
@@ -132,13 +93,10 @@ class ExtractionPipeline:
             "full_text": doc.full_text,
         }
 
-    # ── Serialisation helpers ────────────────────────────────────────────────
 
     def save_json(self, result: dict, output_path: str | Path) -> None:
-        """Save extraction result to JSON (DataFrames excluded)."""
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
-        # Remove DataFrame objects (not JSON serialisable)
         serialisable = json.loads(json.dumps(result, default=str))
         out.write_text(json.dumps(serialisable, indent=2, ensure_ascii=False))
         logger.info("Saved extraction JSON: %s", out)
@@ -146,7 +104,7 @@ class ExtractionPipeline:
     @staticmethod
     def _block_to_dict(block) -> dict:
         d = dataclasses.asdict(block)
-        d["bbox"] = list(d["bbox"])   # tuple → list for JSON
+        d["bbox"] = list(d["bbox"])   
         return d
 
     @staticmethod
@@ -159,11 +117,9 @@ class ExtractionPipeline:
             "bbox": list(table.bbox) if table.bbox else None,
             "confidence": table.confidence,
             "caption": table.caption,
-            # dataframe intentionally excluded from JSON; use markdown for embedding
         }
 
 
-# ── CLI convenience ──────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import sys

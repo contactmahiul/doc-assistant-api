@@ -16,7 +16,9 @@ async def retrieve_relevant_chunks(
     threshold: float | None = None
 ) -> tuple[list, int]:
 
-    threshold = threshold if threshold is not None else settings.RETRIEVAL_DISTANCE_THRESHOLD
+    threshold = threshold  
+    if not threshold:
+        threshold = settings.RETRIEVAL_DISTANCE_THRESHOLD
 
     query_vector = get_cached_embedding(question)
     if query_vector is None:
@@ -32,10 +34,10 @@ async def retrieve_relevant_chunks(
                 c.content,
                 c.document_id,
                 d.title AS document_title,
-                c.embedding <-> CAST(:qvec AS vector) AS distance
+                c.embedding <=> CAST(:qvec AS vector) AS distance
             FROM chunk c
             JOIN document d ON d.id = c.document_id
-            ORDER BY c.embedding <-> CAST(:qvec AS vector)
+            ORDER BY c.embedding <=> CAST(:qvec AS vector)
             LIMIT :top_k
         """), {
             "qvec": str(query_vector),

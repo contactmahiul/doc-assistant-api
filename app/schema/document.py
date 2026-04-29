@@ -4,7 +4,6 @@ from typing import Optional
 from enum import Enum
 
 
-# ── Enums ────────────────────────────────────────────────────────────────────
 
 class ChunkType(str, Enum):
     TEXT = "text"
@@ -19,7 +18,6 @@ class ExtractionStatus(str, Enum):
     FAILED = "failed"
 
 
-# ── Chunk Schemas ─────────────────────────────────────────────────────────────
 
 class ChunkBase(BaseModel):
     content: str
@@ -49,7 +47,6 @@ class ChunkRead(ChunkBase):
     model_config = {"from_attributes": True}
 
 
-# ── Document Schemas ──────────────────────────────────────────────────────────
 
 class DocumentBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
@@ -78,7 +75,6 @@ class DocumentUpdate(BaseModel):
     content: Optional[str] = Field(None, min_length=1)
 
 
-# ── Upload Response ───────────────────────────────────────────────────────────
 
 class PDFUploadResponse(BaseModel):
     id: int
@@ -93,7 +89,6 @@ class PDFUploadResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Extraction Status Update (internal use) ───────────────────────────────────
 
 class DocumentExtractionUpdate(BaseModel):
     page_count: Optional[int] = None

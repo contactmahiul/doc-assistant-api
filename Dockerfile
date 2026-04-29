@@ -25,10 +25,10 @@ RUN apt-get update && apt-get install -y \
 
 # Step 4: Install Python libraries (Cached Layer)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+RUN pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm
 # Step 5: Copy your project code
 COPY . .
 
 # Step 6: Start the server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}", "--reload"]

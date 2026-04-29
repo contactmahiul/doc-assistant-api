@@ -7,7 +7,6 @@ from app.extractors.ocr_handler import OCRBackend
 
 logger = logging.getLogger(__name__)
 
-# Single pipeline instance — reused across requests
 _pipeline = ExtractionPipeline(
     run_ocr=True,
     ocr_backend=OCRBackend.TESSERACT,
@@ -21,16 +20,12 @@ _pipeline = ExtractionPipeline(
 
 
 async def extract_text_from_pdf(file: UploadFile) -> dict:
-    """
-    Run the full extraction pipeline on an uploaded PDF.
-    Returns the structured result dict from ExtractionPipeline.run()
-    """
+
     pdf_bytes = await file.read()
 
     if not pdf_bytes:
         raise ValueError("Uploaded PDF file is empty")
 
-    # Pipeline needs a file path, not bytes — save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
@@ -41,10 +36,8 @@ async def extract_text_from_pdf(file: UploadFile) -> dict:
         logger.error(f"Extraction pipeline failed: {e}")
         raise ValueError(f"Failed to extract content from PDF: {e}")
     finally:
-        # Always clean up temp file
         os.unlink(tmp_path)
 
-    # Validate something was actually extracted
     total_content = _count_extractable_content(result)
     if total_content == 0:
         raise ValueError("Could not extract any content from PDF")
@@ -61,7 +54,6 @@ async def extract_text_from_pdf(file: UploadFile) -> dict:
 
 
 def _count_extractable_content(result: dict) -> int:
-    """Count total extractable items across all pages."""
     total = 0
     for page in result["pages"]:
         total += len([b for b in page["blocks"] if b["text"].strip()])

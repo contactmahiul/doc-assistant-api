@@ -1,27 +1,9 @@
-"""
-ocr_handler.py
-─────────────────────────────────────────────────────────────────────────────
-OCR for scanned or image-only PDF pages.
-
-Strategy:
-  1. Render the PDF page to a high-res image via pymupdf
-  2. Run Tesseract (via pytesseract) or EasyOCR depending on config
-  3. Return OCR'd text as PageBlock objects so it slots cleanly into the
-     ExtractedDocument.pages list produced by pdf_extractor.py
-
-Dependencies:
-  pip install pymupdf pytesseract easyocr pillow
-  system: apt install tesseract-ocr tesseract-ocr-eng   (or your language pack)
-"""
-
 from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-
-import fitz  # pymupdf
+import fitz  
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -37,21 +19,11 @@ class OCRResult:
     page_number: int
     text: str
     backend_used: str
-    confidence: float | None   # 0-100, tesseract only
+    confidence: float | None  
 
 
 class OCRHandler:
-    """
-    Usage
-    -----
-    handler = OCRHandler(backend=OCRBackend.TESSERACT, dpi=300)
 
-    # OCR a single page (1-indexed)
-    result = handler.ocr_page("scan.pdf", page_number=3)
-
-    # OCR a list of page numbers flagged by the extractor
-    results = handler.ocr_pages("scan.pdf", page_numbers=[2, 5, 9])
-    """
 
     def __init__(
         self,
@@ -62,9 +34,7 @@ class OCRHandler:
         self.backend = backend
         self.dpi = dpi
         self.language = language
-        self._easyocr_reader = None   # lazy init (heavy)
-
-    # ── Public API ──────────────────────────────────────────────────────────
+        self._easyocr_reader = None   
 
     def ocr_page(self, pdf_path: str | Path, page_number: int) -> OCRResult:
         """OCR a single page (1-indexed)."""
@@ -85,7 +55,6 @@ class OCRHandler:
                 logger.error("OCR failed on page %d: %s", pn, e)
         return results
 
-    # ── Render ───────────────────────────────────────────────────────────────
 
     def _render_page(self, pdf_path: str, page_number: int) -> Image.Image:
         doc = fitz.open(pdf_path)
@@ -97,7 +66,6 @@ class OCRHandler:
         doc.close()
         return img
 
-    # ── OCR dispatch ─────────────────────────────────────────────────────────
 
     def _run_ocr(self, img: Image.Image, page_number: int) -> OCRResult:
         if self.backend == OCRBackend.TESSERACT:
@@ -142,7 +110,7 @@ class OCRHandler:
 
         img_array = np.array(img)
         results = self._easyocr_reader.readtext(img_array, detail=1)
-        texts = [r[1] for r in results if r[2] > 0.3]   # filter low-conf
+        texts = [r[1] for r in results if r[2] > 0.3]   
         confs = [r[2] for r in results if r[2] > 0.3]
 
         text = " ".join(texts)
