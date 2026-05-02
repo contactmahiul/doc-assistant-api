@@ -1,14 +1,12 @@
-
-from fastapi import APIRouter, Depends,Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.api.deps import get_db
 from app.schema.chat import ChatRequest, ChatResponse
 from app.schema.query import ChunkResult
-from app.utils.embeddings import embed_text
 from app.utils.llm import generate_answer
 from app.utils.retrieval import retrieve_relevant_chunks
+from app.utils.reranker import rerank                    # ✅ new
 import asyncio
 from app.core.limiter import limiter
 from app.cache import get_cached_response, set_cached_response
@@ -20,33 +18,50 @@ router = APIRouter()
 @limiter.limit("10/minute")
 async def chat(request: Request, payload: ChatRequest, db: Session = Depends(get_db)):
 
-    cached = get_cached_response(payload.question)
+    cache_key = f"{payload.question}::{payload.search_mode}"
+    cached = get_cached_response(cache_key)
     if cached:
         return ChatResponse(**cached)
 
     relevant, filtered_count = await retrieve_relevant_chunks(
         question=payload.question,
         db=db,
-        top_k=payload.top_k,
+        top_k=max(payload.top_k * 4, 20),  
         threshold=payload.threshold,
         search_mode=payload.search_mode,
-    )   
+    )
 
-    chunk_texts = []
+    if not relevant:
+        return ChatResponse(
+            question=payload.question,
+            answer="I could not find relevant information in the documents.",
+            search_mode=payload.search_mode,
+            filtered_count=filtered_count,
+            sources=[],
+        )
+
+    top_texts = await rerank(
+        question=payload.question,
+        chunks=relevant,
+        top_n=payload.top_k,                
+    )
+
+    reranked_set = set(top_texts)
     sources = []
 
     for item in relevant:
         if payload.search_mode == "hybrid":
-            row = item["row"]                          
+            row = item["row"]
             score_kwargs = {"rrf_score": round(item["rrf_score"], 6)}
         elif payload.search_mode == "keyword":
-            row = item                                 
+            row = item
             score_kwargs = {"fts_rank": round(item.fts_rank, 6)}
-        else: 
-            row = item                                 
+        else:  
+            row = item
             score_kwargs = {"distance": round(item.distance, 4)}
 
-        chunk_texts.append(row.content)               
+        if row.content not in reranked_set: 
+            continue
 
         sources.append(ChunkResult(
             chunk_index=row.chunk_index,
@@ -58,17 +73,15 @@ async def chat(request: Request, payload: ChatRequest, db: Session = Depends(get
             fts_rank=score_kwargs.get("fts_rank"),
         ))
 
-    answer = await asyncio.to_thread(generate_answer, payload.question, chunk_texts)
+    answer = await asyncio.to_thread(generate_answer, payload.question, top_texts)
 
     response = ChatResponse(
         question=payload.question,
         answer=answer,
-        search_mode=payload.search_mode,               
+        search_mode=payload.search_mode,
         filtered_count=filtered_count,
         sources=sources,
     )
 
-    set_cached_response(payload.question, response.model_dump())
-
+    set_cached_response(cache_key, response.model_dump())
     return response
-    
