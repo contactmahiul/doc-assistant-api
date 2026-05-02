@@ -1,7 +1,7 @@
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, Float,Index
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, Float,Index,Column,Computed
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from pgvector.sqlalchemy import Vector
 from app.db.base_class import Base
 from datetime import datetime
@@ -15,7 +15,6 @@ class Document(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     source: Mapped[str] = mapped_column(String(50), nullable=False, server_default="text")
 
-    # Extraction pipeline fields
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     scanned_pages: Mapped[list[int]] = mapped_column(ARRAY(Integer), nullable=False, server_default="{}")
     extraction_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
@@ -31,7 +30,6 @@ class Chunk(Base):
     embedding: Mapped[list[float] | None] = mapped_column(Vector(384), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    # Extraction pipeline fields
     chunk_type: Mapped[str] = mapped_column(String(20), nullable=False, server_default="text")
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     section_heading: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -48,4 +46,10 @@ class Chunk(Base):
             postgresql_with={"lists": 10},
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
+    )
+
+    fts_vector = Column(
+    TSVECTOR,
+    Computed("to_tsvector('english', coalesce(content, ''))", persisted=True),
+    nullable=False,
     )

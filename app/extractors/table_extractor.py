@@ -1,22 +1,3 @@
-"""
-table_extractor.py
-─────────────────────────────────────────────────────────────────────────────
-Extracts tables from PDFs for RAG pipelines.
-
-Strategy:
-  1. pdfplumber — fast, works well for most digital PDFs
-  2. camelot (lattice) — fallback for ruled/bordered tables
-  3. camelot (stream) — last resort for borderless tables
-
-Each extracted table is returned as an ExtractedTable with:
-  • A pandas DataFrame for structured access
-  • A markdown-formatted string for embedding (LLMs read this well)
-  • Page number and bounding-box coordinates
-  • Confidence score (camelot) or None (pdfplumber)
-
-Dependencies:
-  pip install pdfplumber camelot-py[cv] pandas opencv-python-headless ghostscript
-"""
 
 from __future__ import annotations
 
@@ -31,29 +12,24 @@ import pdfplumber
 logger = logging.getLogger(__name__)
 
 
-# ─────────────────────────── Data model ─────────────────────────────────────
 
 @dataclass
 class ExtractedTable:
-    page_number: int           # 1-indexed
-    table_index: int           # order of appearance on this page (0-indexed)
-    extractor_used: str        # "pdfplumber" | "camelot-lattice" | "camelot-stream"
+    page_number: int          
+    table_index: int           
+    extractor_used: str        
     dataframe: pd.DataFrame
-    markdown: str              # ready to embed into a chunk
-    bbox: Optional[tuple[float, float, float, float]] = None   # (x0, y0, x1, y1)
-    confidence: Optional[float] = None    # 0-100, camelot only
-    caption: Optional[str] = None         # text immediately above/below the table
+    markdown: str             
+    bbox: Optional[tuple[float, float, float, float]] = None   
+    confidence: Optional[float] = None   
+    caption: Optional[str] = None         
 
 
-# ─────────────────────────── Utilities ──────────────────────────────────────
 
 def _df_to_markdown(df: pd.DataFrame) -> str:
-    """Convert a DataFrame to a compact markdown table string."""
     if df.empty:
         return ""
-    # Fill NaN with empty string for cleaner output
     df = df.fillna("").astype(str)
-    # Use first row as header if it looks like one (all non-numeric strings)
     if _looks_like_header(df.iloc[0].tolist()):
         headers = df.iloc[0].tolist()
         rows = df.iloc[1:].values.tolist()
@@ -77,7 +53,6 @@ def _df_to_markdown(df: pd.DataFrame) -> str:
 
 
 def _looks_like_header(row: list[str]) -> bool:
-    """Heuristic: header rows have short non-numeric strings."""
     if not row:
         return False
     non_numeric = sum(1 for cell in row if cell.strip() and not _is_numeric(cell))
@@ -98,23 +73,9 @@ def _clean_cell(val) -> str:
     return str(val).strip().replace("\n", " ")
 
 
-# ─────────────────────────── Extractor ──────────────────────────────────────
 
 class TableExtractor:
-    """
-    Usage
-    -----
-    extractor = TableExtractor()
-    tables = extractor.extract("path/to/file.pdf")
 
-    for t in tables:
-        print(t.page_number, t.confidence)
-        print(t.markdown)
-        print(t.dataframe.head())
-
-    # Per-page
-    page_tables = extractor.extract_page("path/to/file.pdf", page_number=3)
-    """
 
     def __init__(
         self,
@@ -128,10 +89,8 @@ class TableExtractor:
         self.confidence_threshold = confidence_threshold
         self.use_camelot_fallback = use_camelot_fallback
 
-    # ── Public API ──────────────────────────────────────────────────────────
 
     def extract(self, pdf_path: str | Path) -> list[ExtractedTable]:
-        """Extract all tables from all pages."""
         path = Path(pdf_path).resolve()
         results: list[ExtractedTable] = []
 
@@ -152,7 +111,6 @@ class TableExtractor:
     def extract_page(
         self, pdf_path: str | Path, page_number: int
     ) -> list[ExtractedTable]:
-        """Extract tables from a single page (1-indexed)."""
         path = Path(pdf_path).resolve()
 
         with pdfplumber.open(str(path)) as pdf:
@@ -166,7 +124,6 @@ class TableExtractor:
 
         return tables
 
-    # ── pdfplumber extraction ────────────────────────────────────────────────
 
     def _extract_with_pdfplumber(
         self, page: pdfplumber.page.Page, page_number: int
@@ -192,7 +149,6 @@ class TableExtractor:
         for idx, raw in enumerate(raw_tables):
             if not raw:
                 continue
-            # Clean cells
             cleaned = [
                 [_clean_cell(cell) for cell in row] for row in raw
             ]
@@ -223,12 +179,10 @@ class TableExtractor:
 
         return results
 
-    # ── camelot fallback ─────────────────────────────────────────────────────
 
     def _extract_with_camelot(
         self, pdf_path: str, page_number: int
     ) -> list[ExtractedTable]:
-        """Try camelot lattice first, then stream."""
         try:
             import camelot
         except ImportError:
@@ -270,6 +224,6 @@ class TableExtractor:
                 )
 
             if results:
-                break   # lattice worked; don't run stream
+                break   
 
         return results

@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: docs_db
     ports:
-      - "5433:5432"  # 5433 to avoid conflict with existing project
+      - "5433:5432"
     volumes:
       - docs_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: docs_redis
     ports:
-      - "6380:6379"  # 6380 to avoid conflict with existing project
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -31,7 +31,7 @@ services:
     build: .
     container_name: docs_fastapi
     ports:
-      - "8001:8000"  # 8001 to avoid conflict with existing project
+      - "8001:8000"
     env_file:
       - .env
     volumes:
@@ -41,6 +41,25 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: docs_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: docs_redisinsight
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
 
 volumes:
   docs_postgres_data:

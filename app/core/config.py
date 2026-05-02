@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
 
     RETRIEVAL_DISTANCE_THRESHOLD : float = 0.8
+    RETRIEVAL_RRF_THRESHOLD : float = 0.002
 
     model_config = SettingsConfigDict(
         env_file=".env",
