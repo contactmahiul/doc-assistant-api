@@ -11,6 +11,9 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     question: str
     answer: str
-    search_mode: str          
-    sources: list[ChunkResult]
+    search_mode: str
     filtered_count: int
+    sources: list[ChunkResult]
+    faithfulness_score: float | None = None    
+    faithfulness_reason: str | None = None     
+   

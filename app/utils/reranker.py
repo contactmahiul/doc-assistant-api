@@ -1,4 +1,3 @@
-# app/utils/reranker.py
 import logging
 import asyncio
 from flashrank import Ranker, RerankRequest

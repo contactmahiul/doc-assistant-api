@@ -6,12 +6,17 @@ from app.schema.chat import ChatRequest, ChatResponse
 from app.schema.query import ChunkResult
 from app.utils.llm import generate_answer
 from app.utils.retrieval import retrieve_relevant_chunks
-from app.utils.reranker import rerank                    # ✅ new
+from app.utils.reranker import rerank                    
 import asyncio
 from app.core.limiter import limiter
 from app.cache import get_cached_response, set_cached_response
+from app.utils.faithfulness import faithfulness_check, FALLBACK_ANSWER, FAITHFULNESS_THRESHOLD
+import logging
+
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
 
 
 @router.post("/", response_model=ChatResponse)
@@ -74,6 +79,14 @@ async def chat(request: Request, payload: ChatRequest, db: Session = Depends(get
         ))
 
     answer = await asyncio.to_thread(generate_answer, payload.question, top_texts)
+    faith = await faithfulness_check(answer, top_texts)
+
+    if faith["score"] < FAITHFULNESS_THRESHOLD:
+        logger.warning(
+            f"Faithfulness check failed | score={faith['score']} "
+            f"reason='{faith['reason']}' question='{payload.question[:60]}'"
+        )
+        answer = FALLBACK_ANSWER
 
     response = ChatResponse(
         question=payload.question,
@@ -81,6 +94,8 @@ async def chat(request: Request, payload: ChatRequest, db: Session = Depends(get
         search_mode=payload.search_mode,
         filtered_count=filtered_count,
         sources=sources,
+        faithfulness_score=faith["score"],     
+        faithfulness_reason=faith["reason"],
     )
 
     set_cached_response(cache_key, response.model_dump())
